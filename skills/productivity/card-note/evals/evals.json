@@ -1,0 +1,23 @@
+{
+  "skill_name": "card-note",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Turn this copied reading highlight into a permanent note, but do not let me lazily store the original wording: \"Most people mistake repeated exposure for mastery because familiarity is easier to feel than recall is to test.\"",
+      "expected_output": "The response should avoid treating the copied sentence as the full final note body, ask for or infer a paraphrased core idea, and produce an atomic card-note structure with source handling.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have a rough Obsidian idea: when teams use dashboards as a comfort blanket, they stop asking whether the metric still drives a decision. Please turn it into a card note and suggest two meaningful related-note directions.",
+      "expected_output": "The response should output one clear card note in complete sentences, preserve atomicity, and include a small related-notes section with reasons for the links.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "These bullets probably belong to more than one note: tutorials reduce fear, checklists reduce memory load, and examples reduce ambiguity. Split them into the strongest card and proposed follow-up cards.",
+      "expected_output": "The response should identify that the input is not atomic, choose a primary card, and propose split candidates instead of forcing everything into one note.",
+      "files": []
+    }
+  ]
+}

@@ -21,11 +21,12 @@ Use this skill when the user:
 
 ## Core rules
 
-1. Write one core idea per note.
-2. Prefer paraphrase over copy-paste.
-3. Use complete sentences for the main claim.
-4. Add links only when the relationship is meaningful.
-5. Keep the note useful on its own, even when opened months later.
+1. **永久笔记不能代写，只能润色。** 核心观点和措辞必须来自用户本人。AI 的作用是：润色语言、建议链接、拆分复合内容、检查原子性。绝不代用户表达他们没说过的主张。
+2. Write one core idea per note.
+3. Prefer paraphrase over copy-paste.
+4. Use complete sentences for the main claim.
+5. Add links only when the relationship is meaningful.
+6. Keep the note useful on its own, even when opened months later.
 
 ## Workflow
 

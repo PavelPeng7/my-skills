@@ -1,462 +1,345 @@
 ---
 name: video-to-wiki-lesson
-description: 将视频课程逐节转化为图文并茂的 Obsidian LLM Wiki 笔记 — 字幕处理、关键帧截图、Section 级图文文章编写、从字幕提取知识点生成学习资料（摘要/测验/词汇表）适用于大课程批量导入（6-Phase 流程）和已有字幕的内容学习
+description: 视频→图文笔记。下载转录截图→单视频笔记/字幕深度学习(摘要测验)/大课程批量导入。yt-dlp+Whisper，1700+平台。
 allowed-tools: Read, Write, Terminal, File, Vision, Search
 ---
 
-# 视频课程 → Obsidian 图文笔记 + 字幕学习工作流
+# Video → Article 全能视频转图文工作流
 
-## 核心原则（节省 Token）
+## 核心能力矩阵
 
-1. **字幕预处理优先**：不要将原始 SRT 直接喂给文章编写 agent。先用脚本剥离时间码和序号，只传纯文本。
-2. **截图引用先写，帧批量后截**：写文章时用预计算 slug 写 `![[wikilink]]`，不边写边截。ffmpeg 批量一锅端。
-3. **文章密度倾斜**：Intro/总结类课程（标题含 "Intro"、"Wrap-Up"、"Overview"）1-2 句带过。实操/演示/项目类课程详细展开。
-4. **并行 Section**：200+ 视频的大课程用 `delegate_task` 并行处理 Section（最多 3 个并行）。
+| 模式 | 输入 | 输出 | 适用场景 |
+|------|------|------|---------|
+| **A: 单视频笔记** | 视频URL/文件 | 图文混排Obsidian笔记+Git推送 | 影评、教程、烹饪、Vlog |
+| **B: 字幕学习** | 已有字幕文件(.srt/.vtt) | 摘要/测验/词汇表/问答 | 已有字幕，只想提取知识 |
+| **C: 大课程导入** | 课程文件夹(50+视频) | Section级图文文章+index索引 | Udemy/慕课等批量课程 |
 
-## 单视频/独立文件/会议处理
+## 模式 A: 单视频 → 图文笔记
 
-当用户直接发一个独立视频文件（非课程系列视频），走简化流程。详见 `references/single-video-ingest.md`。
+### 触发词
 
-## 字幕学习模式
+"转成笔记"、"图文笔记"、"下载这个视频"、"分析这条视频"
 
-当用户只想从已有字幕文件中学习/提取知识点（不做课程导入），使用 `references/subtitle-study-modes.md`。支持 5 种模式：知识提取、章节摘要、测验生成、关键词汇、交互式问答。
+### 工作流（9步）
 
-## 大课程策略（50+ 视频 / 100+ 视频）
+#### Step 1: 识别平台 + 认证
 
-### 原则
+**平台速查表**：
 
-**六 Phase 流程**（见 `references/large-course-ingest-workflow.md`）：
+| 平台 | Cookie | 格式策略 | 备注 |
+|------|--------|---------|------|
+| Bilibili (b23.tv/bilibili.com) | ✅ 需要 | 先 `-F` 查看格式ID | BV号格式，412反爬 |
+| YouTube (youtube.com/youtu.be) | ❌ | `bestvideo[height<=720]+bestaudio` | 直下 |
+| TED/Coursera/Udemy | 视情况 | `-F` 查看 | 付费内容需登录 |
+| 抖音/TikTok/小红书 | ❌ | 自动 | 短视频 |
+| 其他1700+平台 | 视情况 | `-F` 查看 | |
 
-| Phase | 做什么 | Token 策略 |
-|-------|--------|-----------|
-| ① 目录分析 | 列出 Section 结构、视频列表 | 极低（~500 tokens） |
-| ② 字幕预处理 | 批量剥离 SRT 元数据 → 纯文本 | 一次性终端脚本，零 token 消耗 |
-| ③ 截图规划 | 预计算所有 slug + ffmpeg 命令 | 一次性终端脚本，零 token 消耗 |
-| ④ 批量截图 | ffmpeg 批量执行 | 后台 terminal，零 token 消耗 |
-| ⑤ 并行写文章 | delegate_task × 最多 3 个 Section | 每篇仅传纯文本（SRT 量的 45%） |
-| ⑥ 收尾 | index.md + log + README | 极低 |
+**Bilibili Cookie处理**：
+```bash
+# 将浏览器 Cookie 导出为 Netscape 格式
+python3 path/to/bili_cookie_to_netscape.py
+```
 
-### ② 字幕预处理脚本
+#### Step 2: 解析视频ID + 获取元信息
 
-复用模板（见 `templates/preprocess-srt.py`）：
-1. 复制到课程目录
-2. 修改 `SECTIONS` 定义和 `LEVEL_DIRS` 路径
-3. 运行
+```bash
+# Bilibili短链解析
+VIDEO_ID=$(curl -sL "https://b23.tv/XXXXX" -o /dev/null -w "%{url_effective}" | sed 's/.*\/video\///;s/[\/?].*//')
+
+# 获取信息
+yt-dlp --no-download --print "%(title)s|%(duration)s|%(uploader)s" "<URL>"
+```
+
+#### Step 3: 下载视频
+
+**策略**：< 4分钟 → 1080p；≥ 4分钟 → 720p
+
+```bash
+# 先查格式
+yt-dlp -F "<URL>"
+
+# 下载（Bilibili需加--cookies）
+mkdir -p "<TEMP_DIR>/<VIDEO_ID>"
+yt-dlp -o "<TEMP_DIR>/<VIDEO_ID>/video.%(ext)s" \
+  -f "<选定的格式ID>" --merge-output-format mp4 "<URL>"
+```
+
+#### Step 4: Whisper语音转文字
+
+```bash
+python3 << 'PYEOF'
+from faster_whisper import WhisperModel
+model = WhisperModel("base", device="cpu", compute_type="float32",
+                     download_root="<CACHE_DIR>")
+segments, _ = model.transcribe("<TEMP_DIR>/<ID>/video.mp4", language="zh", beam_size=5)
+with open("<TEMP_DIR>/<ID>/transcript.txt", "w") as f:
+    for seg in segments:
+        f.write(f"[{seg.start:.1f}s - {seg.end:.1f}s] {seg.text.strip()}\n")
+PYEOF
+```
+
+语言：中文→`language="zh"`，英文→`language="en"`，自动→省略参数
+模型：tiny(最快) < base(推荐) < small(最准)
+Apple Silicon加速：`device="mps", compute_type="float16"`
+
+#### Step 5: 内容分类 + 截图规划
+
+**先根据转录内容为视频分类**，再按类型决定截图策略：
+
+| 视频类型 | 特征 | 截图数 | 密度 |
+|---------|------|--------|------|
+| **讲演/影评** | 核心论点递进，口播为主 | 8-12张 | 每30-40秒文字配1张 |
+| **实操/教程** | 步骤递进，操作画面 | 3-8张 | 每步骤1张 |
+| **论坛/对谈** | 多人讨论，观点交错 | 5-8张 | 每人切换/话题转折1张 |
+| **Vlog/杂谈** | 松散叙事 | 3-5张 | 场景切换时 |
+| **<30s短视频** | 单点信息 | 1张 | 开头 |
+| **30-120s** | 简短内容 | 3-5张 | 分段截取 |
+
+**截图时刻判断**：
+- 讲演类：开头标题画面→引出核心概念→每个论点首帧→金句出现→结尾
+- 实操类：操作步骤变化→UI/界面变化→有代表性画面
+- ❌ 不截：过渡语、纯口播无画面变化、重复画面
+
+**截图文件名**：kebab-case英文，两位数字前缀（`01-intro.jpg`、`02-core-concept.jpg`）
+
+#### Step 6: 批量截图
+
+```bash
+VIDEO="<TEMP_DIR>/<ID>/video.mp4"
+OUTDIR="<TEMP_DIR>/<ID>/screenshots"
+mkdir -p "$OUTDIR"
+# -ss 放 -i 前面 = 精确seek，速度快
+ffmpeg -y -ss <秒> -i "$VIDEO" -frames:v 1 "$OUTDIR/01-intro.jpg"
+```
+
+#### Step 7: 生成图文笔记
+
+```bash
+mkdir -p "<VAULT>/assets/video/<VIDEO_ID>"
+cp <TEMP_DIR>/<ID>/screenshots/*.jpg "<VAULT>/assets/video/<VIDEO_ID>/"
+```
+
+笔记结构：
+
+```markdown
+---
+title: <核心主题>
+source: <Bilibili|YouTube|...>
+author: <UP主/频道>
+type: 文献笔记
+tags: [视频笔记, <主题标签>]
+created: <YYYY-MM-DD>
+---
+
+# <作者>：<标题>
+
+> **来源**：<平台> @<作者>
+
+## 📌 核心洞见
+1-2段概括
+
+![[../../../assets/video/<ID>/02-xxx.jpg]]
+
+## ⚡ <分节标题>
+...
+![[../../../assets/video/<ID>/xxx.jpg]]
+> 「<原文引用>」
+
+## 🎯 行动清单
+- [ ] ...
+
+## 💬 金句
+> ...
+
+## 🔗 相关链接
+- [[已有笔记]] — 关联原因
+```
+
+引用格式：`![[../../../assets/video/<ID>/<filename>.jpg]]`
+
+#### Step 8: 知识库关联
+
+```bash
+find "<VAULT>" -name "*.md" | xargs grep -li "<核心关键词>"
+```
+
+#### Step 9: Git推送
+
+```bash
+cd "<VAULT>" && git add -A && git commit -m "文献笔记(图文): <标题>" && git push
+```
+
+---
+
+## 模式 B: 字幕深度学习
+
+### 触发词
+
+"学习这个字幕"、"总结内容"、"出几道题"、"整理术语"、"考考我"
+
+### 前置：输入来源
+
+| 来源 | 获取方式 | 预处理 |
+|------|---------|--------|
+| 视频自带 .srt/.vtt | 直接读取 | 有则先用 |
+| 无字幕但已下载视频 | yt-dlp下字幕或Whisper转录 | 剥离时间码→纯文本 |
+| 直接粘贴字幕文本 | 用户提供 | 直接使用 |
+
+### 5种学习模式
+
+#### B1: 知识提取（默认）
+
+生成结构化学习指南：Key Concepts / Key Takeaways / Examples / Glossary
+
+#### B2: 章节摘要
+
+按主题切换自动分章，每章2-3句总结。检测信号：过渡语("Now let's talk about...")、长停顿(>5s间歇)、新术语大量出现。
+
+#### B3: 测验生成
+
+交互式出题：选择题(4选项+解析)、填空题、判断题、简答题。逐题→用户回答→揭示答案。每次最多3题。
+
+#### B4: 关键词汇表
+
+提取领域术语、高频词、明确定义的词汇，输出表格含术语/翻译/上下文解释/出现位置。
+
+#### B5: 交互式问答
+
+从材料提取5-8个核心问题，每次1题3选项，用户回答后揭示答案+原文依据。答错时解释原因。
+
+### 字幕预处理（SRT→纯文本）
+
+原始SRT的55%是元数据，必须先剥离：
 
 ```python
-# srt_to_text.py: 批量剥离 SRT 元数据，按 Section 分组输出纯文本
-import re, os, glob
-
-def strip_srt(srt_path):
-    with open(srt_path, encoding='utf-8') as f:
-        text = f.read()
-    lines = text.split('\n')
+import re
+def strip_srt(srt_text):
+    lines = srt_text.split('\n')
     result = []
     for line in lines:
         line = line.strip()
-        if re.match(r'^\d+$', line): continue
-        if re.match(r'^\d{2}:\d{2}:\d{2}', line): continue
+        if re.match(r'^\d+$', line): continue      # 序号
+        if re.match(r'^\d{2}:\d{2}:\d{2}', line): continue  # 时间码
         if not line: continue
         result.append(line)
     return ' '.join(result)
-
-# 批量处理，按 Section 输出
-for section_videos in sections:
-    texts = []
-    for num, name in section_videos:
-        srt_path = find_srt(num, name)
-        texts.append(f"== Video {num}: {name} ==\n{strip_srt(srt_path)}")
-    with open(f"_preprocessed/section-{slug}.txt", 'w') as f:
-        f.write('\n\n'.join(texts))
 ```
 
-### ③ 截图规划脚本
+### 陷阱
 
-```python
-# plan_screenshots.py: 预计算 slug + ffmpeg 命令
-# 短 < 30s: 1帧 (overview)
-# 中 30-120s: 2帧 (overview, detail)
-# 长 > 120s: 3帧 (overview, detail, result)
-# Section 级: ~12帧精选
-```
+- **超大文件**：分段读取，一次≤1500行
+- **自动字幕误听**：标记 `[可能的转录错误]`
+- **视觉依赖内容**：标注 `[此处为视觉内容]`
+- **多人对话**：自动字幕可能混搭说话人
 
-### ④ 批量截图
+---
 
-写好 ffmpeg 命令列表到 `.sh` 文件，一次性执行：
+## 模式 C: 大课程批量导入
+
+### 六 Phase 流程
+
+| Phase | 做什么 | Token策略 |
+|-------|--------|-----------|
+| ① 目录分析 | 列出Section结构、视频树 | 极低（~500） |
+| ② 字幕预处理 | 批量剥离SRT→纯文本 | 终端脚本，零token |
+| ③ 截图规划 | 预计算slug+ffmpeg命令 | 终端脚本，零token |
+| ④ 批量截图 | ffmpeg一锅端 | 后台终端，零token |
+| ⑤ 并行写文章 | 子代理×最多3个Section | 仅传纯文本+slug表 |
+| ⑥ 收尾 | index.md+日志 | 极低 |
+
+### Phase ① 目录分析
+
+遍历目录，建立 `{Section: [视频列表]}` 结构。按数字前缀精确匹配目录名。
+
+### Phase ② 字幕预处理
+
+使用 `templates/preprocess-srt.py`：复制到课程目录 → 修改配置 → 运行。输出 `_preprocessed/section-{slug}.txt`。
+
+### Phase ③ 截图规划
+
+使用 `templates/plan-screenshots.py`：根据时长和内容类型自动确定截图点。输出 `_screenshot_plan.json` + `_batch_screenshots.sh`。
+
+### Phase ④ 批量截图
+
 ```bash
 bash _batch_screenshots.sh
 ```
-用 `terminal(background=true, notify_on_complete=true, timeout=3600)` 运行。
 
-### ⑤ 并行写文章
+后台执行，ffmpeg不并发。
+
+### Phase ⑤ 并行写文章
+
+**子代理Context三原则（实测省90% token）**：
+
+1. 明确声明"截图已就绪，不要验证文件"
+2. 提供完整slug→label表（不让子代理计算）
+3. 标注不放截图的视频
 
 ```python
-delegate_task(
-    goal=f"写 Level 1 Module 1 的综合图文文章",
-    context=f"""
-    SECTION: L1-M01 - Claude Code Basics
-    包含 8 个视频，纯文本内容如下：
+# ✅ 最优Context（实测~16K input token）
+context = """
+用中文写图文笔记。
 
-    {preprocessed_text}
+输入：_preprocessed/section-01.txt
 
-    文章要求：
-    - Intro 类视频 1-2 句带过
-    - 实操类详细展开
-    - 截图引用用预计算的 slug
-    - 中文撰写
-    """,
-    toolsets=['file']
-)
+截图已全部就绪，不要验证文件。直接写引用：
+  ![[../../../assets/<course>/<slug>-<label>.jpg]]
+
+slug表（每slug配 overview/detail/result 三张）：
+- Installation → installation（3张）
+- Intro → intro（不放截图）
+
+密度：Intro不放截图，其余3张/课。
+
+输出：sources/<course>/section-01-xxx.md
+"""
 ```
+
+并行分配：最多3个子代理，每个最多4个Section。
+
+### Phase ⑥ 收尾
+
+1. 仅主代理统一更新index.md（子代理不碰）
+2. 写导入日志
+3. Git提交
+
+---
 
 ## 前置条件
 
-- FFmpeg 已安装（检查：`ffmpeg -version`）
-- 视频文件 (.mp4) 在同一目录下
-- 字幕来源有两种方式：
-  - **方式 A（优先）**：英文字幕文件 `.en.srt` 存在，直接读取
-  - **方式 B（兜底）**：无字幕时，用 Whisper STT 从视频音频提取语音文字（见 `references/whisper-stt-batch.md`）
-- Obsidian vault 路径为 `B:\GitHub\Obsadian\CourseWiki`
-- 截图路径从 sources/ 目录到 assets/ 目录：`![[../../../assets/{lesson-dir}/{filename}.jpg]]`
+- **yt-dlp** — 视频下载（1700+平台）
+- **ffmpeg** — 音频处理、视频截图
+- **faster-whisper** — Python库，语音转文字
+- **Obsidian Vault** — 配置为 Git 版本控制
+- **Git** — 版本控制与推送
 
-## 哪些时刻值得截图（课程类）
-
-- UI / 界面发生变化时（新组件渲染、布局改变）
-- 代码编辑器展示代码结构时（目录树、文件内容）
-- 演示操作步骤时（点击按钮、输入命令）
-- 视觉效果有代表性的画面（终端输出、截图、图表）
-- 作者展示文档 / 网页时
-
-**不要截**：纯讲演无画面变化的时间段、过渡语（"Let's take a look"）、纯讲解
-
-## 文章密度规则
-
-| 视频类型 | 篇幅 | 截图数量 |
-|---------|------|---------|
-| Intro/Module 介绍 | 1-2 句 + 不截图 | 0 |
-| Wrap-Up/总结 | 2-3 句概要 | 0 |
-| 概念讲解（What is X?） | 半段 + 1 张说明性截图 | 1 |
-| 配置/安装教程 | 一段 + 2-3 张操作截图 | 2-3 |
-| 实操/演示/项目 | 详细展开 + 3-5 张截图 | 3-5 |
-| 最佳实践/技巧 | 一段列表形式 | 1-2 |
-
-## 工作流步骤（优化版）
-
-### Phase 1: 课程结构分析
-1. 遍历目录，列出所有 `.en.srt` 文件 → 建立 `{level}/{section}/{videos}` 结构
-2. 按 Module 分组确定 Section 边界
-3. **Output**: Section 列表
-
-### Phase 2: 字幕预处理（终端脚本，零 token）
-
-用脚本批量将 SRT 纯文本化：
+检查命令：
 ```bash
-python _preprocess_srt.py
+which yt-dlp ffmpeg 2>&1
+python3 -c "from faster_whisper import WhisperModel; print('OK')" 2>&1
 ```
-输出到 `_preprocessed/` 目录，每 Section 一个 `.txt` 文件。
-
-### Phase 3: 截图规划（终端脚本，零 token）
-
-用脚本读取字幕 + ffmpeg 获取视频时长 → 确定每 Section 截图点：
-```bash
-python _plan_screenshots.py
-```
-输出：
-- `_screenshot_plan.json` — 所有截图的时间点、slug、label
-- `_batch_screenshots.sh` — 可执行的 ffmpeg 命令列表
-
-### Phase 4: 批量截图（后台 terminal，零 token）
-
-```bash
-bash _batch_screenshots.sh
-```
-
-### Phase 5: 并行写 Section 文章（delegate_task，最少 token）
-
-一次派发最多 3 个 Section。**Context 构建的关键规则**：
-
-1. **明确声明截图就绪** — 用"截图已全部就绪，不要验证文件"替代"截图在 XXX 目录"
-2. **提供完整的 slug→label 表** — 子代理不会自己去算 slug
-3. **声明哪些视频不放截图** — Intro/Wrap-Up 类单独列出
-4. **设置 density rules 表** — 不是让子代理判断，而是直接告诉它
-5. **限制 toolsets=['file']** — 不给 search 工具能省大笔 token。如果必须给，在 context 中加"不要 search_files 验证截图"
-
-```python
-# ❌ 错误示范（子代理会花大量 token 去验证文件）
-context = f"""
-截图在 assets/claude-code-mastery/ 目录
-slug 格式是 {video-name}-{label}.jpg
-视频列表：...
-"""
-
-# ✅ 正确示范（子代理直接写引用，零验证）
-context = f"""
-截图已全部就绪，不要验证文件。直接写引用：
-  ![[../../../assets/claude-code-mastery/{slug}-{label}.jpg]]
-
-slug 表（每个 slug 都有 overview/detail/result 三张，直接使用）：
-- What is X → what-is-x
-- Installation → installation
-- Intro M01 → intro-m01（不放截图，只有 2 帧）
-
-密度规则：intro-m01 不放截图，其他每课 3 张截图。
-"""
-```
-
-**最佳实践 vs token 消耗（本课程实测数据）：**
-
-| Context 写法 | input token | 子代理工具调用 |
-|-------------|------------|--------------|
-| 只说"截图在目录" | ~214K | 15 次 search_files 验证 |
-| 明确"不要验证"+slug 表 | ~22K | 仅 read_file+write_file |
-| 同上+toolset 限制 | ~16K | 仅 read_file+write_file |
-
-结论：**Phase 5 的核心优化不在文章内容，而在不让子代理做文件验证**。写死 slug 表 + 明确"不要验证"能省 90% input token。toolsets 建议只给 `['file']`，不给 search 工具。
-
-#### 文章结构模板
-
-```
-# {Section Title}
-
-tags: [source, claude-code-mastery, {level}]
-
-## Summary
-
-2-4 句话概括本节核心内容。
-
-## Key Takeaways
-
-- 列出 5-10 个最重要的知识点
-
-## Full Lesson Content with Screenshots
-
-### 1. {课程标题}
-
-Intro 类：1-2 句带过。
 
 ---
 
-### 2. {实操课程标题}
+## 路径约定
 
-{详细展开}
-
-![[../../../assets/claude-code-mastery/{screenshot-filename}.jpg]]
-
-> *"{引用字幕原文}"*
+| 变量 | 用途 | 示例 |
+|------|------|------|
+| `<TEMP_DIR>` | 临时下载/处理 | 项目 workspace 下的临时目录 |
+| `<VAULT>` | Obsidian 库根目录 | B:/你的库路径 或 ~/Documents/Obsidian |
+| `<ATTACH_DIR>` | 截图在Vault中的位置 | `<VAULT>/assets/video/<VIDEO_ID>/` |
+| `<NOTE_DIR>` | 笔记存放目录 | `<VAULT>/文献笔记/` |
 
 ---
 
-## Architecture / Workflow Summary
+## 常见问题
 
-代码结构 / 工作流总结。
-
-## Section Info
-
-**Course**: Claude Code Mastery
-**Level**: {Level}
-**Videos**: {N}
-**Screenshots**: {N} in `assets/claude-code-mastery/`
-```
-
-### Phase 6: 收尾
-
-1. 统一更新 `index.md`
-2. 写导入日志 `wiki/log/{date}-Ingest-Claude-Code-Mastery.md`
-3. 创建 README.md
-
-## 文件位置约定
-
-```
-B:/DownLoad/Claude Code Mastery From Zero to Super Hero/
-├── Claude Code Mastery - Level 1/  ← 原始视频 + 字幕
-├── Claude Code Mastery - Level 2/
-├── Claude Code Mastery - Level 3/
-├── _preprocessed/                   ← 预处理纯文本（Phase 2 输出）
-├── _screenshot_plan.json            ← 截图规划（Phase 3 输出）
-└── _batch_screenshots.sh            ← 批量截图命令（Phase 3 输出）
-
-B:/GitHub/Obsadian/CourseWiki/
-├── assets/
-│   └── claude-code-mastery/         ← 所有截图
-├── wiki/
-│   ├── index.md
-│   ├── log/
-│   └── sources/
-│       └── claude-code-mastery/     ← 10 篇 Section 文章
-```
-
-## 模板文件
-
-本 skill 包含以下可复用模板：
-
-| 文件 | 用途 | 使用方式 |
-|------|------|---------|
-| `templates/preprocess-srt.py` | Phase 2 字幕预处理 | 复制到课程目录，修改 LEVEL_DIRS + SECTIONS 定义，运行 |
-| `templates/plan-screenshots.py` | Phase 3 截图规划 | 复制到课程目录，修改 sections + level_dirs + asset_dir，运行 |
-
-两个模板都使用 `<PLACEHOLDER>` 标记供替换。
-
-## index.md 更新模式（固定）
-
-更新 index.md 时使用以下固定模式，避免 `---` 分隔符的多处匹配问题：
-
-```python
-from hermes_tools import read_file, write_file
-
-content = read_file("wiki/index.md", limit=500)["content"]
-lines = content.split('\n')
-
-# 找到 "## Analysis" 行（或目标插入点前的标记）
-insert_marker = "## Analysis"
-insert_idx = None
-for i, line in enumerate(lines):
-    if line.strip().startswith(insert_marker):
-        insert_idx = i
-        break
-
-# 在标记前插入新内容
-new_section = [
-    "",
-    "## Claude Code Mastery (`sources/claude-code-mastery/`)",
-    "",
-    "### Level 1 — Basics",
-    "- [[section-01-claude-code-basics]] — 描述（N 张截图）",
-    "### Level 2 — Pro Workflows",
-    "### Level 3 — Advanced",
-    "",
-    "---",
-    "",
-]
-
-new_lines = lines[:insert_idx] + new_section + lines[insert_idx:]
-new_content = '\n'.join(new_lines)
-write_file("wiki/index.md", new_content)
-```
-
-## 覆盖导入：清理旧文章
-
-当课程之前已经导入过单课文章，现在要替换为 Section 级文章时：
-
-1. **先清理旧文章和截图**，再写新文章
-2. index.md 中旧 Section 的逐课条目也需清理
-3. 清理时注意不要在 index.md 中误删其他课程的内容
-
-```bash
-rm -f "B:/GitHub/Obsadian/CourseWiki/wiki/sources/{course-dir}/"*.md
-```
-
-### index.md 清理
-
-旧 index.md 可能包含多级子 Section（`#### Section 2 - Setup from Zero`），需要一并清理：
-
-```python
-from hermes_tools import read_file, write_file
-
-content = read_file("B:/GitHub/Obsadian/CourseWiki/wiki/index.md", limit=500)["content"]
-lines = content.split('\n')
-
-start_marker = "### Build Your Own Claude Code"
-end_marker = "---\n"
-# ...找到旧条目并删除
-```
-
-**关键**：旧 index.md 的格式不稳定（可能有页码残留如 `7|` 前缀）。用 `content.find()` + `content.rfind()` 定位比 `patch` 更安全。
-
-1. **写文章时不碰 index.md** — 子代理只写自己的 Section 文章文件
-2. **主代理最后统一更新 index.md** — 等所有文章写完，一次性地插入所有条目
-3. **截图路径定稿后不能改** — Phase 3 输出的 slug 在整个流程中冻结
-4. **文章文件名约定**：`section-{number}-{slug}.md`（如 `section-01-claude-code-basics.md`）
-5. **不要传截图路径以外的 JSON 给子代理** — 只传纯文本内容 + slug 列表，减少 input token
-
-## 子代理 Context 构建（实测优化）
-
-当用 delegate_task 写文章时，context 的写法直接决定 token 消耗：
-
-| Context 写法 | input token | 子代理工具调用 | 来源课程 |
-|-------------|------------|--------------|---------|
-| 只说"截图在目录" | ~214K | 15 次 search_files 验证 | Hermes Agent |
-| 明确"不要验证"+slug 表 | ~22K | 仅 read_file+write_file | Claude Code |
-| 同上+toolset=['file'] | ~16K | 仅 read_file+write_file | Claude Code |
-
-**核心原则**：
-1. **明确声明"截图已全部就绪，不要验证文件"** — 这句话让子代理跳过 file 验证循环
-2. **提供完整的 slug→label 表** — 子代理不会自己去算 slug
-3. **明确声明哪些视频不放截图** — Intro/Wrap-Up 类单独列一行
-4. **限制 toolsets=['file']** — 不给 search 工具。子代理有 `read_file`+`write_file`就够了
-5. **slug 表直接写死**，不让子代理计算
-
-### Context 模板
-
-```
-用中文写 Obsidian LLM Wiki 笔记。
-
-输入数据：{path}/S{num}.txt
-
-截图全部就绪，不要验证文件。直接写引用：![[../../../assets/{course-dir}/{slug}-{label}.jpg]]
-
-slug 表：
-- Section Overview → section-overview(不放截图)
-- XXXX → xxxx-slug（3张：overview, detail, result）
-- XXXX → xxxx-slug2（3张）
-
-密度：Section Overview 和 Recap 不放截图。其他 N 课每课 3 张截图。
-
-输出：{vault_path}/wiki/sources/{course-dir}/section-{num}-{slug}.md
-```
-
-## 目录结构识别（跨课程通用）
-
-### 通用目录匹配策略
-
-不同课程的目录命名模式各不相同。**用数字前缀精确匹配**：
-
-```python
-# 正确做法：按数字前缀匹配
-for d in os.listdir(base):
-    if os.path.isdir(os.path.join(base, d)):
-        if d.startswith(f"{num} "):
-            sec_dirs[sec_id] = os.path.join(base, d)
-```
-
-**历史教训**：避免用 `"Setup" in "Pro Subagents"` 这类模糊匹配。**永远用数字前缀匹配**。
-
-### 视频文件名匹配
-
-```python
-def find_srt(level_dir, video_num):
-    for f in os.listdir(level_dir):
-        if f.endswith('.en.srt') and '(1)' not in f:
-            base_name = f.replace('.en.srt', '')
-            if base_name.startswith(f"{video_num}. ") or base_name.startswith(f"{video_num}."):
-                return os.path.join(level_dir, f)
-    return None
-```
-
-### Level 映射错误
-
-Section 的 `level` 字段容易写错。一定要逐条验证：
-```python
-# ❌ 常见错误
-"L2-M05": {"title": "GitHub Integration", "level": "Level 1", ...}
-# ✅ 正确
-"L2-M05": {"title": "GitHub Integration", "level": "Level 2", ...}
-```
-
-### 视频前缀匹配细节
-
-`startswith("2.2")` **不会**匹配 `"2.2. A..."`。必须传完整前缀（含点号）：
-```python
-if base.startswith(num_prefix + '.') or base.startswith(num_prefix + ' '):
-```
-
-## 陷阱与注意事项
-
-- **当前模型不支持 vision**（如 DeepSeek）时，依赖字幕原文推断截图内容，不要反复尝试 vision
-- **截图不是越多越好** — Section 级文章 10-15 张足够
-- **SRT 预处理不可少**：原始 SRT 的 55% 是元数据，喂给 agent 就是烧 token
-- **视频路径含空格时，ffmpeg 要用双引号包裹**
-- **`.en.srt` 是唯一字幕格式**，不要匹配其他后缀
-- **截图文件名做 kebab-case**，不要用中文或空格
-- **index.md 的 `---` 陷阱**：用 `execute_code` 中的 `content.find()` + `content.rfind()` 定位插入
-- **后台进程并发**：ffmpeg 是 CPU 密集，批量截图不要同时跑多个进程
-- **Preprocessed 文本中保留视频标题行** — 写文章时需要知道哪段文字对应哪个视频
+| 问题 | 解决 |
+|------|------|
+| B站412反爬 | 刷新Cookie，过期需扫码重登 |
+| B站格式ID不可用 | 先用 `-F` 查看，格式ID随视频而异 |
+| YouTube下载失败 | 地区限制→代理；格式不可用→`-f "best[height<=720]"` |
+| Whisper太慢 | 换`tiny`模型；Apple Silicon换`device="mps"` |
+| 截图文件导致Link异常 | 用kebab-case英文命名 |
+| Git推送失败 | `git pull --rebase && git push` |
+| 子代理过度验证截图 | Context写死slug表+声明"不要验证" |

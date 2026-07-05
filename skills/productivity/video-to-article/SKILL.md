@@ -1,5 +1,5 @@
 ---
-name: video-to-wiki-lesson
+name: video-to-article
 description: 视频→图文笔记。下载转录截图→单视频笔记/字幕深度学习(摘要测验)/大课程批量导入。yt-dlp+Whisper，1700+平台。
 allowed-tools: Read, Write, Terminal, File, Vision, Search
 ---

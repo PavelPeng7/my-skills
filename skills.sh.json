@@ -1,0 +1,22 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "AIGC",
+      "description": "Image and visual workflow skills for asset cleanup and content creation.",
+      "skills": [
+        "ui-cutout-splitter"
+      ]
+    },
+    {
+      "title": "Productivity",
+      "description": "Knowledge workflow, note-taking, library management, and video-to-notes skills.",
+      "skills": [
+        "card-note",
+        "eagle-library-skill",
+        "video-to-article"
+      ]
+    }
+  ]
+}

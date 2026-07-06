@@ -4,6 +4,8 @@ description: >
   One or two sentences describing what this skill does. Be specific about
   TRIGGER conditions (user intents, keywords that should activate this)
   and DO NOT TRIGGER conditions (when to stay silent).
+metadata:
+  internal: true
 version: 1.0.0
 ---
 

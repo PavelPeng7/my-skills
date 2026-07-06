@@ -23,7 +23,7 @@ Software engineering workflows for code review, planning, testing, and more.
 General workflow tools and productivity boosters.
 
 - **[eagle-library-skill](skills/productivity/eagle-library-skill/SKILL.md)** — 操作 Eagle 素材资源库（.library 格式）：搜索素材、统计概览、文件夹树、导出清单。支持多个 Eagle 素材库。
-- **[video-to-article](skills/productivity/video-to-article/SKILL.md)** — 全能视频转图文笔记工作流。支持三种模式：单视频图文笔记（下载/Whisper转录/截图/双链）、字幕深度学习（5种模式：摘要/测验/词汇/问答）、大课程批量导入（6-Phase流程+子代理并行）。基于 yt-dlp+faster-whisper，覆盖 1700+ 平台。
+- **[video-to-article](skills/productivity/video-to-article/SKILL.md)** — Turn a video URL/file or subtitle file into article-style notes, subtitle study materials, or batch course imports. Covers download, transcription, screenshot planning, Obsidian/Markdown note generation, and large-course ingestion with `yt-dlp`, `ffmpeg`, and `faster-whisper`.
 - **[card-note](skills/productivity/card-note/SKILL.md)** — 将原始想法、阅读摘录、闪念笔记转化为原子化的 Zettelkasten 卡片笔记。支持分类输入、强制原子化、搜索邻近笔记、双向链接，适合 Obsidian 知识库写作。
 
 ### Health

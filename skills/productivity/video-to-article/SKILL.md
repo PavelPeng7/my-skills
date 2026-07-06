@@ -1,6 +1,11 @@
 ---
 name: video-to-article
-description: 视频→图文笔记。下载转录截图→单视频笔记/字幕深度学习(摘要测验)/大课程批量导入。yt-dlp+Whisper，1700+平台。
+description: >
+  Turn a video URL/file or subtitle file into article-style notes, transcript
+  study materials, or large-course imports with screenshots, yt-dlp, ffmpeg,
+  and Whisper. Trigger when the user asks to turn a video into notes or an
+  article, download and transcribe a video, study subtitles, extract key
+  screenshots, or batch-import a course into Obsidian or Markdown.
 allowed-tools: Read, Write, Terminal, File, Vision, Search
 ---
 

@@ -250,11 +250,11 @@ def strip_srt(srt_text):
 
 ### Phase ② 字幕预处理
 
-使用 `templates/preprocess-srt.py`：复制到课程目录 → 修改配置 → 运行。输出 `_preprocessed/section-{slug}.txt`。
+使用 `scripts/preprocess-srt.py`：复制到课程目录 → 修改配置 → 运行。输出 `_preprocessed/section-{slug}.txt`。
 
 ### Phase ③ 截图规划
 
-使用 `templates/plan-screenshots.py`：根据时长和内容类型自动确定截图点。输出 `_screenshot_plan.json` + `_batch_screenshots.sh`。
+使用 `scripts/plan-screenshots.py`：根据时长和内容类型自动确定截图点。输出 `_screenshot_plan.json` + `_batch_screenshots.sh`。
 
 ### Phase ④ 批量截图
 

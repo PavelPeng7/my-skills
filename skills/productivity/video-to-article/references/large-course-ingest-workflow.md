@@ -19,11 +19,11 @@ CourseName/
 
 ## Phase ② 字幕预处理
 
-使用 `templates/preprocess-srt.py`：复制→修改配置→运行。输出每Section一个纯文本文件。
+使用 `scripts/preprocess-srt.py`：复制→修改配置→运行。输出每Section一个纯文本文件。
 
 ## Phase ③ 截图规划
 
-使用 `templates/plan-screenshots.py`：根据时长自动确定帧数（<30s=1帧, 30-120s=2帧, >120s=3帧）。Intro/总结类不放截图。
+使用 `scripts/plan-screenshots.py`：根据时长自动确定帧数（<30s=1帧, 30-120s=2帧, >120s=3帧）。Intro/总结类不放截图。
 
 ## Phase ④ 批量截图
 

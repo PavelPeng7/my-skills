@@ -4,14 +4,14 @@
   "groupings": [
     {
       "title": "AIGC",
-      "description": "Image and visual workflow skills for asset cleanup and content creation.",
+      "description": "用于图像清理、视觉处理与内容生产的 AIGC 工作流 skills。",
       "skills": [
         "ui-cutout-splitter"
       ]
     },
     {
       "title": "Productivity",
-      "description": "Knowledge workflow, note-taking, library management, and video-to-notes skills.",
+      "description": "用于知识整理、笔记写作、素材管理和视频转笔记的效率类 skills。",
       "skills": [
         "card-note",
         "eagle-library-skill",

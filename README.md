@@ -11,6 +11,7 @@
 面向图像、视频与创意生产流程的 AIGC 工具类 skills。
 
 - **[ui-cutout-splitter](skills/aigc/ui-cutout-splitter/SKILL.md)** — 去除绿幕 / 品红底等色键背景，并将整张 UI 图拆分为可复用精灵。支持连通域切分、语义重命名，以及适合 Unity 的导出流程。
+- **[eagle-icon-image-processing](skills/aigc/eagle-icon-image-processing/SKILL.md)** — 处理游戏与 Unity UI 图像素材：色键去背、精灵拆分、九宫格与网格切图，并提供 Eagle 素材库导入和安全管理流程。
 
 ### Engineering
 
@@ -35,6 +36,9 @@
 ### Game Dev
 
 面向 Unity、Blender 及相关工具链的游戏开发工作流 skills。
+
+- **[douyin-blender-props-to-unity](skills/game-dev/douyin-blender-props-to-unity/SKILL.md)** — 将 Blender 静态道具、武器、家具和 Tripo 模型可靠地导入抖音游戏 Unity 项目；覆盖 Collection 批量导出、贴图导出与材质 Atlas 烘焙。
+- **[douyin-blender-characters-to-unity](skills/game-dev/douyin-blender-characters-to-unity/SKILL.md)** — 将 Blender 角色骨骼、动画、皮肤、顶点组、权重和角色贴图导入抖音游戏 Unity 项目，尤其适用于 Tripo 角色清理。
 
 ## Installing a Skill
 

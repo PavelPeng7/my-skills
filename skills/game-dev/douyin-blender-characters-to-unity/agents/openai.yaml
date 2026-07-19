@@ -1,0 +1,4 @@
+interface:
+  display_name: "Douyin Blender Characters to Unity"
+  short_description: "Prepare Blender characters for reliable Douyin Unity import."
+  default_prompt: "Use $douyin-blender-characters-to-unity to prepare this Blender character for Unity import."

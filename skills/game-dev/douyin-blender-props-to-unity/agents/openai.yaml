@@ -1,0 +1,4 @@
+interface:
+  display_name: "Douyin Blender Props to Unity"
+  short_description: "Prepare Blender props for reliable Douyin Unity import."
+  default_prompt: "Use $douyin-blender-props-to-unity to prepare this Blender prop for Unity import."

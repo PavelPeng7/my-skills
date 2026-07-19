@@ -27,6 +27,8 @@
 - **[video-to-article](skills/productivity/video-to-article/SKILL.md)** — 将视频链接 / 本地视频 / 字幕文件转成图文笔记、字幕学习材料或批量课程导入内容。覆盖下载、转录、截图规划、Obsidian/Markdown 笔记生成，以及基于 `yt-dlp`、`ffmpeg`、`faster-whisper` 的大课程导入流程。
 - **[card-note](skills/productivity/card-note/SKILL.md)** — 将原始想法、阅读摘录、闪念笔记转化为原子化的 Zettelkasten 卡片笔记。支持分类输入、强制原子化、搜索邻近笔记、双向链接，适合 Obsidian 知识库写作。
 
+- **[obsidian-task-management-editor](skills/productivity/obsidian-task-management-editor/SKILL.md)** — Create, edit, schedule, complete, and review project tasks in the PavelObsidianNotes Obsidian vault.
+
 ### Health
 
 健康与生活管理相关 skills。
